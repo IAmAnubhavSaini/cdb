@@ -61,6 +61,7 @@ void signalHandler(int signal) {
 
 int main() {
     if(signal(SIGUSR1, signalHandler) == SIG_ERR) {
+        // User defined signal, used for IPC etc.
         printf("cannot handle SIGUSR1.");
     };
     if(signal(SIGTERM, signalHandler) == SIG_ERR) {
@@ -70,10 +71,11 @@ int main() {
         printf("cannot handle SIGINT.");
     };
     if(signal(SIGKILL, signalHandler) == SIG_ERR) {
+        // This signal cannot be caught
         printf("cannot handle SIGKILL\n");
     };
     if(signal(SIGSTOP, signalHandler)== SIG_ERR) {
-        // ctrl+z: moves program to suspended state
+        // ctrl+z: moves program to suspended state; but this cannot be caught
         printf("cannot handle SIGSTOP\n");
     }
 
