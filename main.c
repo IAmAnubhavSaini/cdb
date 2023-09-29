@@ -48,7 +48,7 @@ typedef enum StatementType {
 } StatementType;
 
 typedef enum ExecuteResult {
-    EXECUTE_SUCCESS, EXECUTE_TABLE_FULL
+    EXECUTE_NONE, EXECUTE_SUCCESS, EXECUTE_TABLE_FULL
 } ExecuteResult;
 
 typedef struct Statement {
@@ -134,8 +134,8 @@ PrepareResult prepareStatement(InputBuffer *ib, Statement *s) {
         s->type = INSERT;
         // Clang-Tidy: 'sscanf' used to convert a string to an integer value,
         // but function will not report conversion errors;
-        // consider using 'strtol' instead
-        int argsAssigned = sscanf(ib->buffer, "insert %d %s %s %s", &(s->rowToInsert.id), s->rowToInsert.username,
+        // consider using 'strtoul' instead
+        int argsAssigned = sscanf(ib->buffer, "insert %x %s %s %s", &(s->rowToInsert.id), s->rowToInsert.username,
                                   s->rowToInsert.email, s->rowToInsert.password);
         if (argsAssigned < 4) {
             return PREPARE_SYNTAX_ERROR;
@@ -150,17 +150,17 @@ PrepareResult prepareStatement(InputBuffer *ib, Statement *s) {
 }
 
 void serializeRow(Row *src, void *dst) {
-    memcpy(dst + ID_OFFSET, &(src->id), ID_SIZE);
-    memcpy(dst + USERNAME_OFFSET, &(src->username), USERNAME_SIZE);
-    memcpy(dst + EMAIL_OFFSET, &(src->email), EMAIL_SIZE);
-    memcpy(dst + PASSWORD_OFFSET, &(src->password), PASSWORD_SIZE);
+    memcpy((char *)dst + ID_OFFSET, &(src->id), ID_SIZE);
+    memcpy((char *)dst + USERNAME_OFFSET, &(src->username), USERNAME_SIZE);
+    memcpy((char *)dst + EMAIL_OFFSET, &(src->email), EMAIL_SIZE);
+    memcpy((char *)dst + PASSWORD_OFFSET, &(src->password), PASSWORD_SIZE);
 }
 
 void deserializeRow(void *src, Row *dst) {
-    memcpy(&(dst->id), src + ID_OFFSET, ID_SIZE);
-    memcpy(&(dst->username), src + USERNAME_OFFSET, USERNAME_SIZE);
-    memcpy(&(dst->email), src + EMAIL_OFFSET, EMAIL_SIZE);
-    memcpy(&(dst->password), src + PASSWORD_OFFSET, PASSWORD_SIZE);
+    memcpy(&(dst->id), (char *)src + ID_OFFSET, ID_SIZE);
+    memcpy(&(dst->username), (char *)src + USERNAME_OFFSET, USERNAME_SIZE);
+    memcpy(&(dst->email), (char *)src + EMAIL_OFFSET, EMAIL_SIZE);
+    memcpy(&(dst->password), (char *)src + PASSWORD_OFFSET, PASSWORD_SIZE);
 }
 
 const u_int32_t TABLE_PAGE_SIZE = 4 * 1024;
@@ -201,7 +201,7 @@ void *rowSlot(Table *table, u_int32_t rowNum) {
     }
     u_int32_t rowOffset = rowNum % ROWS_PER_PAGE;
     u_int32_t byteOffset = rowOffset * ROW_SIZE;
-    return page + byteOffset;
+    return (char *)page + byteOffset;
 }
 
 void printRow(Row *r) {
@@ -219,7 +219,7 @@ ExecuteResult executeInsert(Statement *stmt, Table *t) {
     return EXECUTE_SUCCESS;
 }
 
-ExecuteResult executeSelect(Statement *stmt, Table *t) {
+ExecuteResult executeSelect(Table *t) {
     Row row;
     for (u_int32_t i = 0; i < t->numRows; i++) {
         deserializeRow(rowSlot(t, i), &row);
@@ -237,7 +237,11 @@ ExecuteResult executeStatement(Statement *s, Table *t) {
         }
         case (SELECT): {
             printf("Select...\n");
-            return executeSelect(s, t);
+            return executeSelect(t);
+        }
+        default:{
+            printf("Unknown statement.\n");
+            return EXECUTE_NONE;
         }
     }
 }
@@ -300,6 +304,9 @@ int main() {
                 break;
             case (EXECUTE_TABLE_FULL):
                 printf("Error: Table full.\n");
+                break;
+            case EXECUTE_NONE:
+                printf("Error: Unknown command.\n");
                 break;
         }
     }
