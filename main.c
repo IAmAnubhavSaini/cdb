@@ -18,7 +18,7 @@
 #define COLUMN_EMAIL_SIZE 256
 #define COLUMN_PASSWORD_SIZE 256
 
-typedef struct Row{
+typedef struct Row {
     u_int32_t id;
     char username[COLUMN_USERNAME_SIZE];
     char email[COLUMN_EMAIL_SIZE];
@@ -35,15 +35,15 @@ const u_int32_t EMAIL_OFFSET = USERNAME_OFFSET + USERNAME_SIZE; // 68
 const u_int32_t PASSWORD_OFFSET = EMAIL_OFFSET + EMAIL_SIZE; // 324
 const u_int32_t ROW_SIZE = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE + PASSWORD_SIZE; // 580
 
-typedef enum MetaCommandResult{
+typedef enum MetaCommandResult {
     META_COMMAND_SUCCESS, META_COMMAND_UNRECOGNIZED_COMMAND
 } MetaCommandResult;
 
-typedef enum PrepareResult{
+typedef enum PrepareResult {
     PREPARE_SUCCESS, PREPARE_SYNTAX_ERROR, PREPARE_UNRECOGNIZED_STATEMENT
 } PrepareResult;
 
-typedef enum StatementType{
+typedef enum StatementType {
     INSERT, SELECT
 } StatementType;
 
@@ -56,7 +56,7 @@ typedef struct Statement {
     Row rowToInsert;
 } Statement;
 
-typedef struct InputBuffer{
+typedef struct InputBuffer {
     char *buffer;
     size_t bufferLength;
     size_t inputLength;
@@ -109,7 +109,6 @@ void readInput(InputBuffer *ib) {
 }
 
 
-
 void signalHandler(int signal) {
     printf("\nReceived signal: %d.\n", signal);
     switch (signal) {
@@ -133,9 +132,12 @@ void signalHandler(int signal) {
 PrepareResult prepareStatement(InputBuffer *ib, Statement *s) {
     if (strncmp(ib->buffer, "insert", 6) == 0) {
         s->type = INSERT;
+        // Clang-Tidy: 'sscanf' used to convert a string to an integer value,
+        // but function will not report conversion errors;
+        // consider using 'strtol' instead
         int argsAssigned = sscanf(ib->buffer, "insert %d %s %s %s", &(s->rowToInsert.id), s->rowToInsert.username,
                                   s->rowToInsert.email, s->rowToInsert.password);
-        if(argsAssigned < 4) {
+        if (argsAssigned < 4) {
             return PREPARE_SYNTAX_ERROR;
         }
         return PREPARE_SUCCESS;
@@ -168,22 +170,22 @@ const u_int32_t TABLE_MAX_ROWS = ROWS_PER_PAGE * TABLE_MAX_PAGES;
 
 typedef struct Table {
     u_int32_t numRows;
-    void * pages[TABLE_MAX_PAGES];
-}Table;
+    void *pages[TABLE_MAX_PAGES];
+} Table;
 
-Table * newTable(){
-    Table * t = (Table*) calloc(1, sizeof(Table));
+Table *newTable() {
+    Table *t = (Table *) calloc(1, sizeof(Table));
     t->numRows = 0;
-    for(u_int32_t i = 0; i < TABLE_MAX_PAGES; i++) {
+    for (u_int32_t i = 0; i < TABLE_MAX_PAGES; i++) {
         t->pages[i] = NULL;
     }
     return t;
 }
 
-void closeTable(Table * t) {
+void closeTable(Table *t) {
 //    memset(t->pages, '\0', sizeof(Table));
     t->numRows = 0;
-    for(int i = 0; t->pages[i]; i++) {
+    for (int i = 0; t->pages[i]; i++) {
         memset(t->pages[i], '\0', TABLE_PAGE_SIZE);
         free(t->pages[i]);
     }
@@ -191,10 +193,10 @@ void closeTable(Table * t) {
     free(t);
 }
 
-void * rowSlot(Table * table, u_int32_t rowNum) {
+void *rowSlot(Table *table, u_int32_t rowNum) {
     u_int32_t pageNum = rowNum / ROWS_PER_PAGE;
-    void * page = table->pages[pageNum];
-    if(page == NULL) {
+    void *page = table->pages[pageNum];
+    if (page == NULL) {
         page = table->pages[pageNum] = malloc(TABLE_PAGE_SIZE);
     }
     u_int32_t rowOffset = rowNum % ROWS_PER_PAGE;
@@ -202,24 +204,24 @@ void * rowSlot(Table * table, u_int32_t rowNum) {
     return page + byteOffset;
 }
 
-void printRow(Row * r) {
+void printRow(Row *r) {
     printf("[%d, %s, %s, %s]\n", r->id, r->username, r->email, r->password);
 }
 
-ExecuteResult executeInsert(Statement * stmt, Table * t) {
-    if(t->numRows >= TABLE_MAX_ROWS) {
+ExecuteResult executeInsert(Statement *stmt, Table *t) {
+    if (t->numRows >= TABLE_MAX_ROWS) {
         return EXECUTE_TABLE_FULL;
     }
-    Row * rowToInsert = &(stmt->rowToInsert);
+    Row *rowToInsert = &(stmt->rowToInsert);
     serializeRow(rowToInsert, rowSlot(t, t->numRows));
     t->numRows += 1;
 
     return EXECUTE_SUCCESS;
 }
 
-ExecuteResult executeSelect(Statement * stmt, Table * t) {
+ExecuteResult executeSelect(Statement *stmt, Table *t) {
     Row row;
-    for(u_int32_t i = 0; i < t->numRows; i++) {
+    for (u_int32_t i = 0; i < t->numRows; i++) {
         deserializeRow(rowSlot(t, i), &row);
         printRow(&row);
     }
@@ -227,7 +229,7 @@ ExecuteResult executeSelect(Statement * stmt, Table * t) {
     return EXECUTE_SUCCESS;
 }
 
-ExecuteResult executeStatement(Statement *s, Table * t) {
+ExecuteResult executeStatement(Statement *s, Table *t) {
     switch (s->type) {
         case (INSERT): {
             printf("Insert...\n");
@@ -260,7 +262,7 @@ int main() {
         printf("cannot handle SIGSTOP\n");
     }
 
-    Table * t = newTable();
+    Table *t = newTable();
 
     InputBuffer *ib = newInputBuffer();
     for (int i = 0; i == 0; i += 0) {
@@ -292,7 +294,7 @@ int main() {
             }
         }
         printf("Executed.\n");
-        switch(executeStatement(&s, t)) {
+        switch (executeStatement(&s, t)) {
             case (EXECUTE_SUCCESS):
                 printf("Executed.\n");
                 break;
