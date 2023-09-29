@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
+#include <stdint.h>
+
+#define size_of_attribute(Struct, Attribute) sizeof(((Struct*)0)->Attribute)
 
 #define EXIT_SUCCESS 0
 #define EXIT_SYSTEM_FAILURE 500
@@ -11,21 +14,49 @@
 #define EXIT_USER_INTERRUPT_SIGNAL 403
 #define COMMAND_REPL_EXIT ".exit"
 
-typedef enum {
+#define COLUMN_USERNAME_SIZE 64
+#define COLUMN_EMAIL_SIZE 256
+#define COLUMN_PASSWORD_SIZE 256
+
+typedef struct Row{
+    u_int32_t id;
+    char username[COLUMN_USERNAME_SIZE];
+    char email[COLUMN_EMAIL_SIZE];
+    char password[COLUMN_PASSWORD_SIZE];
+} Row;
+
+const u_int32_t ID_SIZE = size_of_attribute(Row, id); // 4B
+const u_int32_t USERNAME_SIZE = size_of_attribute(Row, username); // 64B
+const u_int32_t EMAIL_SIZE = size_of_attribute(Row, email); // 256B
+const u_int32_t PASSWORD_SIZE = size_of_attribute(Row, password); // 256B
+const u_int32_t ID_OFFSET = 0; // 0
+const u_int32_t USERNAME_OFFSET = ID_OFFSET + ID_SIZE; // 4
+const u_int32_t EMAIL_OFFSET = USERNAME_OFFSET + USERNAME_SIZE; // 68
+const u_int32_t PASSWORD_OFFSET = EMAIL_OFFSET + EMAIL_SIZE; // 324
+const u_int32_t ROW_SIZE = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE + PASSWORD_SIZE; // 580
+
+typedef enum MetaCommandResult{
     META_COMMAND_SUCCESS, META_COMMAND_UNRECOGNIZED_COMMAND
 } MetaCommandResult;
 
-typedef enum {
-    PREPARE_SUCCESS, PREPARE_UNRECOGNIZED_STATEMENT
+typedef enum PrepareResult{
+    PREPARE_SUCCESS, PREPARE_SYNTAX_ERROR, PREPARE_UNRECOGNIZED_STATEMENT
 } PrepareResult;
 
-typedef enum { INSERT, SELECT} StatementType;
+typedef enum StatementType{
+    INSERT, SELECT
+} StatementType;
 
-typedef struct {
+typedef enum ExecuteResult {
+    EXECUTE_SUCCESS, EXECUTE_TABLE_FULL
+} ExecuteResult;
+
+typedef struct Statement {
     StatementType type;
+    Row rowToInsert;
 } Statement;
 
-typedef struct {
+typedef struct InputBuffer{
     char *buffer;
     size_t bufferLength;
     size_t inputLength;
@@ -39,8 +70,21 @@ InputBuffer *newInputBuffer() {
     return ib;
 }
 
-MetaCommandResult doMetaCommand(InputBuffer * ib) {
+void closeInputBuffer(InputBuffer *ib) {
+//    ib->buffer = ""; // does it even work, correctly?
+
+// zero out everything
+    memset(ib->buffer, '\0', ib->bufferLength);
+    ib->inputLength = 0;
+    ib->bufferLength = 0;
+
+    free(ib->buffer);
+    free(ib);
+}
+
+MetaCommandResult doMetaCommand(InputBuffer *ib) {
     if (strcmp(ib->buffer, ".exit") == 0) {
+        closeInputBuffer(ib);
         exit(EXIT_SUCCESS);
     } else {
         return META_COMMAND_UNRECOGNIZED_COMMAND;
@@ -64,10 +108,7 @@ void readInput(InputBuffer *ib) {
     ib->buffer[bytesRead - 1] = 0;
 }
 
-void closeInputBuffer(InputBuffer *ib) {
-    free(ib->buffer);
-    free(ib);
-}
+
 
 void signalHandler(int signal) {
     printf("\nReceived signal: %d.\n", signal);
@@ -89,27 +130,112 @@ void signalHandler(int signal) {
     }
 }
 
-PrepareResult prepareStatement(InputBuffer * ib, Statement * s) {
-    if(strncmp(ib->buffer, "insert", 6)==0) {
+PrepareResult prepareStatement(InputBuffer *ib, Statement *s) {
+    if (strncmp(ib->buffer, "insert", 6) == 0) {
         s->type = INSERT;
+        int argsAssigned = sscanf(ib->buffer, "insert %d %s %s %s", &(s->rowToInsert.id), s->rowToInsert.username,
+                                  s->rowToInsert.email, s->rowToInsert.password);
+        if(argsAssigned < 4) {
+            return PREPARE_SYNTAX_ERROR;
+        }
         return PREPARE_SUCCESS;
     }
-    if(strncmp(ib->buffer, "select", 6) == 0) {
+    if (strncmp(ib->buffer, "select", 6) == 0) {
         s->type = SELECT;
         return PREPARE_SUCCESS;
     }
     return PREPARE_UNRECOGNIZED_STATEMENT;
 }
 
-void executeStatement(Statement * s) {
-    switch(s->type) {
+void serializeRow(Row *src, void *dst) {
+    memcpy(dst + ID_OFFSET, &(src->id), ID_SIZE);
+    memcpy(dst + USERNAME_OFFSET, &(src->username), USERNAME_SIZE);
+    memcpy(dst + EMAIL_OFFSET, &(src->email), EMAIL_SIZE);
+    memcpy(dst + PASSWORD_OFFSET, &(src->password), PASSWORD_SIZE);
+}
+
+void deserializeRow(void *src, Row *dst) {
+    memcpy(&(dst->id), src + ID_OFFSET, ID_SIZE);
+    memcpy(&(dst->username), src + USERNAME_OFFSET, USERNAME_SIZE);
+    memcpy(&(dst->email), src + EMAIL_OFFSET, EMAIL_SIZE);
+    memcpy(&(dst->password), src + PASSWORD_OFFSET, PASSWORD_SIZE);
+}
+
+const u_int32_t TABLE_PAGE_SIZE = 4 * 1024;
+#define TABLE_MAX_PAGES 100
+const u_int32_t ROWS_PER_PAGE = TABLE_PAGE_SIZE / ROW_SIZE;
+const u_int32_t TABLE_MAX_ROWS = ROWS_PER_PAGE * TABLE_MAX_PAGES;
+
+typedef struct Table {
+    u_int32_t numRows;
+    void * pages[TABLE_MAX_PAGES];
+}Table;
+
+Table * newTable(){
+    Table * t = (Table*) calloc(1, sizeof(Table));
+    t->numRows = 0;
+    for(u_int32_t i = 0; i < TABLE_MAX_PAGES; i++) {
+        t->pages[i] = NULL;
+    }
+    return t;
+}
+
+void closeTable(Table * t) {
+//    memset(t->pages, '\0', sizeof(Table));
+    t->numRows = 0;
+    for(int i = 0; t->pages[i]; i++) {
+        memset(t->pages[i], '\0', TABLE_PAGE_SIZE);
+        free(t->pages[i]);
+    }
+    t->numRows = 0;
+    free(t);
+}
+
+void * rowSlot(Table * table, u_int32_t rowNum) {
+    u_int32_t pageNum = rowNum / ROWS_PER_PAGE;
+    void * page = table->pages[pageNum];
+    if(page == NULL) {
+        page = table->pages[pageNum] = malloc(TABLE_PAGE_SIZE);
+    }
+    u_int32_t rowOffset = rowNum % ROWS_PER_PAGE;
+    u_int32_t byteOffset = rowOffset * ROW_SIZE;
+    return page + byteOffset;
+}
+
+void printRow(Row * r) {
+    printf("[%d, %s, %s, %s]\n", r->id, r->username, r->email, r->password);
+}
+
+ExecuteResult executeInsert(Statement * stmt, Table * t) {
+    if(t->numRows >= TABLE_MAX_ROWS) {
+        return EXECUTE_TABLE_FULL;
+    }
+    Row * rowToInsert = &(stmt->rowToInsert);
+    serializeRow(rowToInsert, rowSlot(t, t->numRows));
+    t->numRows += 1;
+
+    return EXECUTE_SUCCESS;
+}
+
+ExecuteResult executeSelect(Statement * stmt, Table * t) {
+    Row row;
+    for(u_int32_t i = 0; i < t->numRows; i++) {
+        deserializeRow(rowSlot(t, i), &row);
+        printRow(&row);
+    }
+
+    return EXECUTE_SUCCESS;
+}
+
+ExecuteResult executeStatement(Statement *s, Table * t) {
+    switch (s->type) {
         case (INSERT): {
             printf("Insert...\n");
-            break;
+            return executeInsert(s, t);
         }
         case (SELECT): {
             printf("Select...\n");
-            break;
+            return executeSelect(s, t);
         }
     }
 }
@@ -134,6 +260,8 @@ int main() {
         printf("cannot handle SIGSTOP\n");
     }
 
+    Table * t = newTable();
+
     InputBuffer *ib = newInputBuffer();
     for (int i = 0; i == 0; i += 0) {
         printPrompt();
@@ -155,13 +283,23 @@ int main() {
         switch (prepareStatement(ib, &s)) {
             case (PREPARE_SUCCESS):
                 break;
+            case (PREPARE_SYNTAX_ERROR):
+                printf("Syntax error. Could not parse statement.\n");
+                continue;
             case (PREPARE_UNRECOGNIZED_STATEMENT): {
                 printf("Unrecognized keyword at start of '%s'.\n", ib->buffer);
                 continue;
             }
         }
-        executeStatement(&s);
         printf("Executed.\n");
+        switch(executeStatement(&s, t)) {
+            case (EXECUTE_SUCCESS):
+                printf("Executed.\n");
+                break;
+            case (EXECUTE_TABLE_FULL):
+                printf("Error: Table full.\n");
+                break;
+        }
     }
     return 0;
 }
