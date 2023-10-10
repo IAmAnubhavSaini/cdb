@@ -51,7 +51,7 @@ typedef enum MetaCommandResult {
 } MetaCommandResult;
 
 typedef enum PrepareResult {
-    PREPARE_SUCCESS, PREPARE_STRING_TOO_LONG, PREPARE_SYNTAX_ERROR, PREPARE_UNRECOGNIZED_STATEMENT
+    PREPARE_SUCCESS, PREPARE_NON_POSITIVE_ID, PREPARE_STRING_TOO_LONG, PREPARE_SYNTAX_ERROR, PREPARE_UNRECOGNIZED_STATEMENT
 } PrepareResult;
 
 typedef enum StatementType {
@@ -161,6 +161,9 @@ PrepareResult prepareInsert(InputBuffer *ib, Statement *s) {
     int tmp = (int) strtol(idStr, &err, 10);
     if (*err) {
         tmp = -1;
+    }
+    if(tmp <= 0) {
+        return PREPARE_NON_POSITIVE_ID;
     }
     int id = tmp;
 
@@ -335,6 +338,9 @@ int main() {
         switch (prepareStatement(ib, &s)) {
             case (PREPARE_SUCCESS):
                 break;
+            case (PREPARE_NON_POSITIVE_ID):
+                printf("Input error: ID must be positive.\n");
+                continue;
             case (PREPARE_STRING_TOO_LONG):
                 printf("Input error: String is too long.\n");
                 continue;

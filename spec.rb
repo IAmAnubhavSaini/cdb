@@ -112,4 +112,44 @@ describe 'database' do
             "db > ",
         ])
     end
+
+    it 'prints an error message if id is negative' do
+        script = [
+            "insert -1 u e p",
+            "select",
+            ".exit",
+        ]
+        result = run_script(script)
+        expect(result).to match_array([
+            "",
+            "COMMAND: insert ID(number) username(string) email(string) password(string)",
+            "COMMAND: select",
+            "COMMAND: .exit",
+            "",
+            "db > Input error: ID must be positive.",
+            "",
+            "db > done.",
+            "db > ",
+        ])
+    end
+
+    it 'prints an error message if id is zero' do
+            script = [
+                "insert 0 u e p",
+                "select",
+                ".exit",
+            ]
+            result = run_script(script)
+            expect(result).to match_array([
+                "",
+                "COMMAND: insert ID(number) username(string) email(string) password(string)",
+                "COMMAND: select",
+                "COMMAND: .exit",
+                "",
+                "db > Input error: ID must be positive.",
+                "",
+                "db > done.",
+                "db > ",
+            ])
+        end
 end
