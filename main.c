@@ -14,8 +14,13 @@
 #define EXIT_USER_INTERRUPT_SIGNAL 403
 #define COMMAND_REPL_EXIT ".exit"
 #define COMMAND_REPL_INSERT "insert"
+#define COMMAND_REPL_SELECT "select"
 #define REPL_PROMPT "\ndb > "
 #define COMMAND_REPL_DONE "done."
+
+#define INSERT_ARGS_OUT_OF_BOUND 4
+#define INSERT_COMPARE_LENGTH 6
+#define SELECT_COMPARE_LENGTH 6
 
 #define COLUMN_USERNAME_SIZE 64
 #define COLUMN_EMAIL_SIZE 256
@@ -133,19 +138,19 @@ void signalHandler(int signal) {
 }
 
 PrepareResult prepareStatement(InputBuffer *ib, Statement *s) {
-    if (strncmp(ib->buffer, COMMAND_REPL_INSERT, 6) == 0) {
+    if (strncmp(ib->buffer, COMMAND_REPL_INSERT, INSERT_COMPARE_LENGTH) == 0) {
         s->type = INSERT;
         // Clang-Tidy: 'sscanf' used to convert a string to an integer value,
         // but function will not report conversion errors;
         // consider using 'strtoul' instead
         int argsAssigned = sscanf(ib->buffer, "insert %x %s %s %s", &(s->rowToInsert.id), s->rowToInsert.username,
                                   s->rowToInsert.email, s->rowToInsert.password);
-        if (argsAssigned < 4) {
+        if (argsAssigned < INSERT_ARGS_OUT_OF_BOUND) {
             return PREPARE_SYNTAX_ERROR;
         }
         return PREPARE_SUCCESS;
     }
-    if (strncmp(ib->buffer, "select", 6) == 0) {
+    if (strncmp(ib->buffer, COMMAND_REPL_SELECT, SELECT_COMPARE_LENGTH) == 0) {
         s->type = SELECT;
         return PREPARE_SUCCESS;
     }
