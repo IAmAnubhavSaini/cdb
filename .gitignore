@@ -3,6 +3,10 @@ node_modules/
 *.sqlite3
 *.out
 *.exe
+build_db
+.bundle
+CMakeFiles
+CMakeCache.txt
 
 ## nodejs gitignore: https://github.com/github/gitignore/blob/main/Node.gitignore
 # Logs

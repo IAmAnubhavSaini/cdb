@@ -12,11 +12,14 @@
 #define EXIT_USER_SIGNAL 401
 #define EXIT_USER_TERMINATE_SIGNAL 402
 #define EXIT_USER_INTERRUPT_SIGNAL 403
+
 #define COMMAND_REPL_EXIT ".exit"
 #define COMMAND_REPL_INSERT "insert"
 #define COMMAND_REPL_SELECT "select"
+#define MESSAGE_REPL_DONE "done."
+#define MESSAGE_REPL_TABLE_FULL "Error: Table full.\n"
+
 #define REPL_PROMPT "\ndb > "
-#define COMMAND_REPL_DONE "done."
 
 #define INSERT_ARGS_OUT_OF_BOUND 4
 #define INSERT_COMPARE_LENGTH 6
@@ -28,9 +31,9 @@
 
 typedef struct Row {
     u_int32_t id;
-    char username[COLUMN_USERNAME_SIZE];
-    char email[COLUMN_EMAIL_SIZE];
-    char password[COLUMN_PASSWORD_SIZE];
+    char username[COLUMN_USERNAME_SIZE + 1];
+    char email[COLUMN_EMAIL_SIZE + 1];
+    char password[COLUMN_PASSWORD_SIZE + 1];
 } Row;
 
 const u_int32_t ID_SIZE = size_of_attribute(Row, id); // 4B
@@ -136,6 +139,20 @@ void signalHandler(int signal) {
             printf("Program won't handle it.\n");
     }
 }
+
+//PrepareResult prepareInsert(InputBuffer *ib, Statement *s) {
+//    s->type = INSERT;
+//
+//    char * keyword = strtok(ib->buffer, " ");
+//    char * id = strtok(NULL, " ");
+//    char * username = strtok(NULL, " ");
+//    char * email = strtok(NULL," ");
+//    char * password = strtok(NULL, " ");
+//
+//    if(id == NULL || username == NULL || email == NULL || password == NULL) {
+//        return PREPARE_SYNTAX_ERROR;
+//    }
+//}
 
 PrepareResult prepareStatement(InputBuffer *ib, Statement *s) {
     if (strncmp(ib->buffer, COMMAND_REPL_INSERT, INSERT_COMPARE_LENGTH) == 0) {
@@ -314,10 +331,10 @@ int main() {
 //        printf("Executed.\t");
         switch (executeStatement(&s, t)) {
             case (EXECUTE_SUCCESS):
-                printf(COMMAND_REPL_DONE);
+                printf(MESSAGE_REPL_DONE);
                 break;
             case (EXECUTE_TABLE_FULL):
-                printf("Error: Table full.\n");
+                printf(MESSAGE_REPL_TABLE_FULL);
                 break;
             case EXECUTE_NONE:
                 printf("Error: Unknown command.\n");
