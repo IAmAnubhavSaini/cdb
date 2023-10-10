@@ -90,27 +90,26 @@ describe 'database' do
     end
 
 
-#     it 'prints error message for input that are above the maximum length' do
-#         long_username = "a"*65
-#         long_email = "a"*257
-#         long_password = "a" * 257
-#         script = [
-#             "insert 1 #{long_username} #{long_email} #{long_password}",
-#             "select",
-#             ".exit",
-#         ]
-#         result = run_script(script)
-#         expect(result).to match_array([
-#              "",
-#             "COMMAND: insert ID(number) username(string) email(string) password(string)",
-#             "COMMAND: select",
-#             "COMMAND: .exit",
-#             "",
-#             "db > ",
-#             "db > [1, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]",
-#             "done.",
-#
-#             "db > done.",
-#         ])
-#     end
+    it 'prints error message for input that are above the maximum length' do
+        long_username = "a"*65
+        long_email = "a"*257
+        long_password = "a" * 257
+        script = [
+            "insert 1 #{long_username} #{long_email} #{long_password}",
+            "select",
+            ".exit",
+        ]
+        result = run_script(script)
+        expect(result).to match_array([
+            "",
+            "COMMAND: insert ID(number) username(string) email(string) password(string)",
+            "COMMAND: select",
+            "COMMAND: .exit",
+            "",
+            "db > Input error: String is too long.",
+            "",
+            "db > done.",
+            "db > ",
+        ])
+    end
 end

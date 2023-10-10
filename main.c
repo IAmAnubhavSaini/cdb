@@ -51,7 +51,7 @@ typedef enum MetaCommandResult {
 } MetaCommandResult;
 
 typedef enum PrepareResult {
-    PREPARE_SUCCESS, PREPARE_SYNTAX_ERROR, PREPARE_UNRECOGNIZED_STATEMENT
+    PREPARE_SUCCESS, PREPARE_STRING_TOO_LONG, PREPARE_SYNTAX_ERROR, PREPARE_UNRECOGNIZED_STATEMENT
 } PrepareResult;
 
 typedef enum StatementType {
@@ -140,32 +140,47 @@ void signalHandler(int signal) {
     }
 }
 
-//PrepareResult prepareInsert(InputBuffer *ib, Statement *s) {
-//    s->type = INSERT;
-//
-//    char * keyword = strtok(ib->buffer, " ");
-//    char * id = strtok(NULL, " ");
-//    char * username = strtok(NULL, " ");
-//    char * email = strtok(NULL," ");
-//    char * password = strtok(NULL, " ");
-//
-//    if(id == NULL || username == NULL || email == NULL || password == NULL) {
-//        return PREPARE_SYNTAX_ERROR;
-//    }
-//}
+PrepareResult prepareInsert(InputBuffer *ib, Statement *s) {
+    s->type = INSERT;
+
+    char *keyword = strtok(ib->buffer, " ");
+    char *idStr = strtok(NULL, " ");
+    char *username = strtok(NULL, " ");
+    char *email = strtok(NULL, " ");
+    char *password = strtok(NULL, " ");
+
+    if (idStr == NULL || username == NULL || email == NULL || password == NULL) {
+        return PREPARE_SYNTAX_ERROR;
+    }
+
+    /*
+     * Clang-Tidy: 'atoi' used to convert a string to an integer value, but function will not report conversion errors; consider using 'strtol' instead
+     * int id = atoi(idStr);
+     */
+    char *err;
+    int tmp = (int) strtol(idStr, &err, 10);
+    if (*err) {
+        tmp = -1;
+    }
+    int id = tmp;
+
+    if (strlen(username) > COLUMN_USERNAME_SIZE) {
+        return PREPARE_STRING_TOO_LONG;
+    }
+    if (strlen(email) > COLUMN_EMAIL_SIZE) {
+        return PREPARE_STRING_TOO_LONG;
+    }
+
+    s->rowToInsert.id = id;
+    strcpy(s->rowToInsert.username, username);
+    strcpy(s->rowToInsert.email, email);
+    strcpy(s->rowToInsert.password, password);
+
+}
 
 PrepareResult prepareStatement(InputBuffer *ib, Statement *s) {
     if (strncmp(ib->buffer, COMMAND_REPL_INSERT, INSERT_COMPARE_LENGTH) == 0) {
-        s->type = INSERT;
-        // Clang-Tidy: 'sscanf' used to convert a string to an integer value,
-        // but function will not report conversion errors;
-        // consider using 'strtoul' instead
-        int argsAssigned = sscanf(ib->buffer, "insert %x %s %s %s", &(s->rowToInsert.id), s->rowToInsert.username,
-                                  s->rowToInsert.email, s->rowToInsert.password);
-        if (argsAssigned < INSERT_ARGS_OUT_OF_BOUND) {
-            return PREPARE_SYNTAX_ERROR;
-        }
-        return PREPARE_SUCCESS;
+        return prepareInsert(ib, s);
     }
     if (strncmp(ib->buffer, COMMAND_REPL_SELECT, SELECT_COMPARE_LENGTH) == 0) {
         s->type = SELECT;
@@ -175,17 +190,17 @@ PrepareResult prepareStatement(InputBuffer *ib, Statement *s) {
 }
 
 void serializeRow(Row *src, void *dst) {
-    memcpy((char *)dst + ID_OFFSET, &(src->id), ID_SIZE);
-    memcpy((char *)dst + USERNAME_OFFSET, &(src->username), USERNAME_SIZE);
-    memcpy((char *)dst + EMAIL_OFFSET, &(src->email), EMAIL_SIZE);
-    memcpy((char *)dst + PASSWORD_OFFSET, &(src->password), PASSWORD_SIZE);
+    memcpy((char *) dst + ID_OFFSET, &(src->id), ID_SIZE);
+    memcpy((char *) dst + USERNAME_OFFSET, &(src->username), USERNAME_SIZE);
+    memcpy((char *) dst + EMAIL_OFFSET, &(src->email), EMAIL_SIZE);
+    memcpy((char *) dst + PASSWORD_OFFSET, &(src->password), PASSWORD_SIZE);
 }
 
 void deserializeRow(void *src, Row *dst) {
-    memcpy(&(dst->id), (char *)src + ID_OFFSET, ID_SIZE);
-    memcpy(&(dst->username), (char *)src + USERNAME_OFFSET, USERNAME_SIZE);
-    memcpy(&(dst->email), (char *)src + EMAIL_OFFSET, EMAIL_SIZE);
-    memcpy(&(dst->password), (char *)src + PASSWORD_OFFSET, PASSWORD_SIZE);
+    memcpy(&(dst->id), (char *) src + ID_OFFSET, ID_SIZE);
+    memcpy(&(dst->username), (char *) src + USERNAME_OFFSET, USERNAME_SIZE);
+    memcpy(&(dst->email), (char *) src + EMAIL_OFFSET, EMAIL_SIZE);
+    memcpy(&(dst->password), (char *) src + PASSWORD_OFFSET, PASSWORD_SIZE);
 }
 
 const u_int32_t TABLE_PAGE_SIZE = 4 * 1024;
@@ -226,7 +241,7 @@ void *rowSlot(Table *table, u_int32_t rowNum) {
     }
     u_int32_t rowOffset = rowNum % ROWS_PER_PAGE;
     u_int32_t byteOffset = rowOffset * ROW_SIZE;
-    return (char *)page + byteOffset;
+    return (char *) page + byteOffset;
 }
 
 void printRow(Row *r) {
@@ -264,7 +279,7 @@ ExecuteResult executeStatement(Statement *s, Table *t) {
 //            printf("Select...\t");
             return executeSelect(t);
         }
-        default:{
+        default: {
             printf("Unknown statement.\n");
             return EXECUTE_NONE;
         }
@@ -320,6 +335,9 @@ int main() {
         switch (prepareStatement(ib, &s)) {
             case (PREPARE_SUCCESS):
                 break;
+            case (PREPARE_STRING_TOO_LONG):
+                printf("Input error: String is too long.\n");
+                continue;
             case (PREPARE_SYNTAX_ERROR):
                 printf("Syntax error. Could not parse statement.\n");
                 continue;
