@@ -13,6 +13,9 @@
 #define EXIT_USER_TERMINATE_SIGNAL 402
 #define EXIT_USER_INTERRUPT_SIGNAL 403
 #define COMMAND_REPL_EXIT ".exit"
+#define COMMAND_REPL_INSERT "insert"
+#define REPL_PROMPT "\ndb > "
+#define COMMAND_REPL_DONE "done."
 
 #define COLUMN_USERNAME_SIZE 64
 #define COLUMN_EMAIL_SIZE 256
@@ -83,7 +86,7 @@ void closeInputBuffer(InputBuffer *ib) {
 }
 
 MetaCommandResult doMetaCommand(InputBuffer *ib) {
-    if (strcmp(ib->buffer, ".exit") == 0) {
+    if (strcmp(ib->buffer, COMMAND_REPL_EXIT) == 0) {
         closeInputBuffer(ib);
         exit(EXIT_SUCCESS);
     } else {
@@ -92,7 +95,7 @@ MetaCommandResult doMetaCommand(InputBuffer *ib) {
 }
 
 void printPrompt() {
-    printf("db > ");
+    printf(REPL_PROMPT);
 }
 
 void readInput(InputBuffer *ib) {
@@ -130,7 +133,7 @@ void signalHandler(int signal) {
 }
 
 PrepareResult prepareStatement(InputBuffer *ib, Statement *s) {
-    if (strncmp(ib->buffer, "insert", 6) == 0) {
+    if (strncmp(ib->buffer, COMMAND_REPL_INSERT, 6) == 0) {
         s->type = INSERT;
         // Clang-Tidy: 'sscanf' used to convert a string to an integer value,
         // but function will not report conversion errors;
@@ -232,11 +235,11 @@ ExecuteResult executeSelect(Table *t) {
 ExecuteResult executeStatement(Statement *s, Table *t) {
     switch (s->type) {
         case (INSERT): {
-            printf("Insert...\n");
+//            printf("Insert...\t");
             return executeInsert(s, t);
         }
         case (SELECT): {
-            printf("Select...\n");
+//            printf("Select...\t");
             return executeSelect(t);
         }
         default:{
@@ -250,21 +253,27 @@ int main() {
     if (signal(SIGUSR1, signalHandler) == SIG_ERR) {
         // User defined signal, used for IPC etc.
         printf("cannot handle SIGUSR1.");
-    };
+    }
     if (signal(SIGTERM, signalHandler) == SIG_ERR) {
         printf("cannot handle SIGTERM.");
-    };
+    }
     if (signal(SIGINT, signalHandler) == SIG_ERR) {
         printf("cannot handle SIGINT.");
-    };
-    if (signal(SIGKILL, signalHandler) == SIG_ERR) {
-        // This signal cannot be caught
-        printf("cannot handle SIGKILL\n");
-    };
-    if (signal(SIGSTOP, signalHandler) == SIG_ERR) {
-        // ctrl+z: moves program to suspended state; but this cannot be caught
-        printf("cannot handle SIGSTOP\n");
     }
+//    Cannot handle SIGKILL
+//    if (signal(SIGKILL, signalHandler) == SIG_ERR) {
+//        // This signal cannot be caught
+//        printf("cannot handle SIGKILL\n");
+//    }
+//    Cannot handle SIGSTOP
+//    if (signal(SIGSTOP, signalHandler) == SIG_ERR) {
+//        // ctrl+z: moves program to suspended state; but this cannot be caught
+//        printf("cannot handle SIGSTOP\n");
+//    }
+
+    printf("\nCOMMAND: insert ID(number) username(string) email(string) password(string)");
+    printf("\nCOMMAND: select");
+    printf("\nCOMMAND: .exit\n");
 
     Table *t = newTable();
 
@@ -297,10 +306,10 @@ int main() {
                 continue;
             }
         }
-        printf("Executed.\n");
+//        printf("Executed.\t");
         switch (executeStatement(&s, t)) {
             case (EXECUTE_SUCCESS):
-                printf("Executed.\n");
+                printf(COMMAND_REPL_DONE);
                 break;
             case (EXECUTE_TABLE_FULL):
                 printf("Error: Table full.\n");
