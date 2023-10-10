@@ -1,7 +1,14 @@
 describe 'database' do
+    before do
+        `rm -rf test.db`
+    end
+    after :all do
+        `rm -rf test.db`
+    end
+
     def run_script(commands)
         raw_output = ""
-        IO.popen("./build_db", "r+") do |pipe|
+        IO.popen("./build_db test.db", "r+") do |pipe|
             commands.each do |command|
 #                 puts "command", command
 #                 raw_output += command + "\n"
@@ -168,20 +175,19 @@ describe 'database' do
             "db > ",
         ])
 
-#         result2 = run_script([
-#             "select",
-#             ".exit",
-#         ])
-#         expect(result2).to match_array([
-#             "",
-#             "COMMAND: insert ID(number) username(string) email(string) password(string)",
-#             "COMMAND: select",
-#             "COMMAND: .exit",
-#             "",
-#             "[1, u, e, p)",
-#             "done.",
-#             "db > done.",
-#             "db > ",
-#         ])
+        result2 = run_script([
+            "select",
+            ".exit",
+        ])
+        expect(result2).to match_array([
+            "",
+            "COMMAND: insert ID(number) username(string) email(string) password(string)",
+            "COMMAND: select",
+            "COMMAND: .exit",
+            "",
+            "db > [1, u, e, p]",
+            "done.",
+            "db > ",
+        ])
     end
 end
