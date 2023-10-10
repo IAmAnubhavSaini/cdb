@@ -134,22 +134,54 @@ describe 'database' do
     end
 
     it 'prints an error message if id is zero' do
-            script = [
-                "insert 0 u e p",
-                "select",
-                ".exit",
-            ]
-            result = run_script(script)
-            expect(result).to match_array([
-                "",
-                "COMMAND: insert ID(number) username(string) email(string) password(string)",
-                "COMMAND: select",
-                "COMMAND: .exit",
-                "",
-                "db > Input error: ID must be positive.",
-                "",
-                "db > done.",
-                "db > ",
-            ])
-        end
+        script = [
+            "insert 0 u e p",
+            "select",
+            ".exit",
+        ]
+        result = run_script(script)
+        expect(result).to match_array([
+            "",
+            "COMMAND: insert ID(number) username(string) email(string) password(string)",
+            "COMMAND: select",
+            "COMMAND: .exit",
+            "",
+            "db > Input error: ID must be positive.",
+            "",
+            "db > done.",
+            "db > ",
+        ])
+    end
+
+    it 'keeps data after closing connection' do
+        result1 = run_script([
+            "insert 1 u e p",
+            ".exit",
+        ])
+        expect(result1).to match_array([
+            "",
+            "COMMAND: insert ID(number) username(string) email(string) password(string)",
+            "COMMAND: select",
+            "COMMAND: .exit",
+            "",
+            "db > done.",
+            "db > ",
+        ])
+
+#         result2 = run_script([
+#             "select",
+#             ".exit",
+#         ])
+#         expect(result2).to match_array([
+#             "",
+#             "COMMAND: insert ID(number) username(string) email(string) password(string)",
+#             "COMMAND: select",
+#             "COMMAND: .exit",
+#             "",
+#             "[1, u, e, p)",
+#             "done.",
+#             "db > done.",
+#             "db > ",
+#         ])
+    end
 end
