@@ -20,6 +20,7 @@
 #include "commands.h"
 #include "row.h"
 #include "table.h"
+#include "cursor.h"
 
 #define EXIT_SUCCESS 0
 #define EXIT_SYSTEM_FAILURE 500
@@ -69,11 +70,5 @@ typedef struct InputBuffer {
 } InputBuffer;
 
 
-
-typedef struct Cursor {
-    Table *table;
-    uint32_t rowNum;
-    bool EoT; // EndOfTable; location after last row.
-} Cursor;
 
 #endif //CDB_STRUCTURES_H

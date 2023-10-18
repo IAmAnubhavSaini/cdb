@@ -1,7 +1,6 @@
 #include "structures.h"
 
 
-
 InputBuffer *newInputBuffer() {
     InputBuffer *ib = (InputBuffer *) malloc(sizeof(InputBuffer) * 1);
     ib->buffer = NULL;
@@ -127,9 +126,6 @@ void deserializeRow(void *src, Row *dst) {
 }
 
 
-
-
-
 Pager *pagerOpen(const char *filename) {
     int fd = open(filename, O_RDWR | O_CREAT, // Read/Write or Create
                   S_IWUSR | S_IRUSR // write/read permission
@@ -154,7 +150,6 @@ Pager *pagerOpen(const char *filename) {
 }
 
 
-
 Table *dbOpen(const char *filename) {
     Pager *pager = pagerOpen(filename);
     uint32_t numRows = pager->length / ROW_SIZE;
@@ -164,27 +159,27 @@ Table *dbOpen(const char *filename) {
     return table;
 }
 
-void * getPage(Pager * pager, uint32_t pageNum) {
-    if(pageNum > TABLE_MAX_PAGES) {
+void *getPage(Pager *pager, uint32_t pageNum) {
+    if (pageNum > TABLE_MAX_PAGES) {
         printf("Range error: Tried to fetch page number out of bounds. %d > %d\n", pageNum, TABLE_MAX_PAGES);
         exit(EXIT_FAILURE);
     }
 
-    if(pager->pages[pageNum] == NULL) {
+    if (pager->pages[pageNum] == NULL) {
         // CACHE miss
-        void * page = (void*)(malloc(TABLE_PAGE_SIZE));
+        void *page = (void *) (malloc(TABLE_PAGE_SIZE));
         uint32_t numberOfPages = pager->length / TABLE_PAGE_SIZE;
 
         // Partial page save at End of File
-        if(pager->length % TABLE_PAGE_SIZE){
+        if (pager->length % TABLE_PAGE_SIZE) {
             numberOfPages += 1;
         }
 
-        if(pageNum <= numberOfPages){
+        if (pageNum <= numberOfPages) {
             //unistd.h # define SEEK_SET	0	/* Seek from beginning of file.  */
             lseek(pager->fd, pageNum * TABLE_PAGE_SIZE, SEEK_SET);
             ssize_t bytesRead = read(pager->fd, page, TABLE_PAGE_SIZE);
-            if(bytesRead == -1){
+            if (bytesRead == -1) {
                 printf("Error reading file: %d\n", errno);
                 exit(EXIT_FAILURE);
             }
@@ -195,31 +190,31 @@ void * getPage(Pager * pager, uint32_t pageNum) {
     return pager->pages[pageNum];
 }
 
-void flushPager(Pager * pager, uint32_t pageNum, uint32_t size){
-    if(pager->pages[pageNum] == NULL) {
+void flushPager(Pager *pager, uint32_t pageNum, uint32_t size) {
+    if (pager->pages[pageNum] == NULL) {
         printf("Error: Tried to flush NULL page\n");
         exit(EXIT_FAILURE);
     }
 
     off_t offset = lseek(pager->fd, pageNum * TABLE_PAGE_SIZE, SEEK_SET);
-    if(offset == -1) {
+    if (offset == -1) {
         printf("Error: Cannot seek from the beginning. %d\n", errno);
         exit(EXIT_FAILURE);
     }
 
     ssize_t bytesWritten = write(pager->fd, pager->pages[pageNum], size);
-    if(bytesWritten == -1) {
+    if (bytesWritten == -1) {
         printf("Error: Cannot write. %d\n", errno);
         exit(EXIT_FAILURE);
     }
 }
 
-void dbClose(Table * table) {
-    Pager * pager = table->pager;
+void dbClose(Table *table) {
+    Pager *pager = table->pager;
     uint32_t numFullPages = table->numRows / ROWS_PER_PAGE;
 
-    for(uint32_t i = 0; i < numFullPages; i++){
-        if(pager->pages[i] == NULL) {
+    for (uint32_t i = 0; i < numFullPages; i++) {
+        if (pager->pages[i] == NULL) {
             continue;
         }
         flushPager(pager, i, TABLE_PAGE_SIZE);
@@ -228,9 +223,9 @@ void dbClose(Table * table) {
     }
 
     uint32_t numPartialPageRows = table->numRows % ROWS_PER_PAGE;
-    if(numPartialPageRows > 0) {
+    if (numPartialPageRows > 0) {
         uint32_t pageNum = numFullPages;
-        if(pager->pages[pageNum] != NULL) {
+        if (pager->pages[pageNum] != NULL) {
             flushPager(pager, pageNum, numPartialPageRows * ROW_SIZE);
             free(pager->pages[pageNum]);
             pager->pages[pageNum] = NULL;
@@ -238,13 +233,13 @@ void dbClose(Table * table) {
     }
 
     int result = close(pager->fd);
-    if(result == -1) {
+    if (result == -1) {
         printf("Error closing db.\n");
         exit(EXIT_FAILURE);
     }
-    for(uint32_t i = 0; i < TABLE_MAX_PAGES; i++) {
-        void * page = pager->pages[i];
-        if(page) {
+    for (uint32_t i = 0; i < TABLE_MAX_PAGES; i++) {
+        void *page = pager->pages[i];
+        if (page) {
             free(page);
             pager->pages[i] = NULL;
         }
@@ -314,7 +309,7 @@ ExecuteResult executeStatement(Statement *s, Table *t) {
     }
 }
 
-int main(int argc, char * argv[]) {
+int main(int argc, char *argv[]) {
     if (signal(SIGUSR1, signalHandler) == SIG_ERR) {
         // User defined signal, used for IPC etc.
         printf("cannot handle SIGUSR1.");
@@ -340,13 +335,13 @@ int main(int argc, char * argv[]) {
     printf("\nCOMMAND: select");
     printf("\nCOMMAND: .exit\n");
 
-    if(argc < 2) {
+    if (argc < 2) {
         printf("Error: Must supply a database filename.\n");
         exit(EXIT_FAILURE);
     }
 
-    char * filename = argv[1];
-    Table * t = dbOpen(filename);
+    char *filename = argv[1];
+    Table *t = dbOpen(filename);
 
     InputBuffer *ib = newInputBuffer();
     for (int i = 0; i == 0; i += 0) {
