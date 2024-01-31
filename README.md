@@ -81,5 +81,4 @@ MIT
 
 ## Reference
 
-[DB tutorial](https://cstack.github.io/db_tutorial/ - Connor Stack)
-
+[DB tutorial](https://cstack.github.io/db_tutorial/)
